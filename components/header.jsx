@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
-import { checkUser } from "@/lib/checkUser";
 import Image from "next/image";
 
 const Header = async ({ isAdminPage = false }) => {
-  const user = await checkUser();
   const isAdmin = user?.role === "ADMIN";
 
   return (
