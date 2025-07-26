@@ -55,8 +55,14 @@ const carFormSchema = z.object({
     const year = parseInt(val);
     return !isNaN(year) && year >= 1900 && year <= new Date().getFullYear() + 1;
   }, "Valid year required"),
-  price: z.string().min(1, "Price is required"),
-  mileage: z.string().min(1, "Mileage is required"),
+  price: z.string().refine((val) => {
+    const price = parseFloat(val);
+    return !isNaN(price) && price > 0;
+  }, "Price must be a valid number greater than 0"),
+  mileage: z.string().refine((val) => {
+    const mileage = parseInt(val);
+    return !isNaN(mileage) && mileage >= 0;
+  }, "Mileage must be a valid number"),
   color: z.string().min(1, "Color is required"),
   fuelType: z.string().min(1, "Fuel type is required"),
   transmission: z.string().min(1, "Transmission is required"),
@@ -65,7 +71,6 @@ const carFormSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters"),
   status: z.enum(["AVAILABLE", "UNAVAILABLE", "SOLD"]),
   featured: z.boolean().default(false),
-  // Images are handled separately
 });
 
 export const AddCarForm = () => {
@@ -126,9 +131,10 @@ export const AddCarForm = () => {
     }
   }, [addCarResult, router]);
 
+  // Handle AI processing errors
   useEffect(() => {
     if (processImageError) {
-      toast.error(processImageError.message || "Failed to upload car");
+      toast.error(processImageError.message || "Failed to process image");
     }
   }, [processImageError]);
 
@@ -138,16 +144,16 @@ export const AddCarForm = () => {
       const carDetails = processImageResult.data;
 
       // Update form with AI results
-      setValue("make", carDetails.make);
-      setValue("model", carDetails.model);
-      setValue("year", carDetails.year.toString());
-      setValue("color", carDetails.color);
-      setValue("bodyType", carDetails.bodyType);
-      setValue("fuelType", carDetails.fuelType);
-      setValue("price", carDetails.price);
-      setValue("mileage", carDetails.mileage);
-      setValue("transmission", carDetails.transmission);
-      setValue("description", carDetails.description);
+      setValue("make", carDetails.make || "");
+      setValue("model", carDetails.model || "");
+      setValue("year", carDetails.year?.toString() || "");
+      setValue("color", carDetails.color || "");
+      setValue("bodyType", carDetails.bodyType || "");
+      setValue("fuelType", carDetails.fuelType || "");
+      setValue("price", carDetails.price?.toString() || "");
+      setValue("mileage", carDetails.mileage?.toString() || "");
+      setValue("transmission", carDetails.transmission || "");
+      setValue("description", carDetails.description || "");
 
       // Add the image to the uploaded images
       const reader = new FileReader();
@@ -156,13 +162,29 @@ export const AddCarForm = () => {
       };
       reader.readAsDataURL(uploadedAiImage);
 
-      toast.success("Successfully extracted car details", {
-        description: `Detected ${carDetails.year} ${carDetails.make} ${
-          carDetails.model
-        } with ${Math.round(carDetails.confidence * 100)}% confidence`,
-      });
+      // Check for missing or invalid critical fields
+      const missingFields = [];
+      if (!carDetails.make) missingFields.push("make");
+      if (!carDetails.model) missingFields.push("model");
+      if (!carDetails.price || parseFloat(carDetails.price) <= 0)
+        missingFields.push("price");
 
-      // Switch to manual tab for the user to review and fill in missing details
+      if (missingFields.length > 0) {
+        toast.warning(
+          `AI could not detect the following fields: ${missingFields.join(
+            ", "
+          )}. Please review and fill them manually.`,
+          { duration: 5000 }
+        );
+      } else {
+        toast.success("Successfully extracted car details", {
+          description: `Detected ${carDetails.year} ${carDetails.make} ${
+            carDetails.model
+          } with ${Math.round(carDetails.confidence * 100)}% confidence`,
+        });
+      }
+
+      // Switch to manual tab for review
       setActiveTab("manual");
     }
   }, [processImageResult, setValue, uploadedAiImage]);
@@ -266,23 +288,27 @@ export const AddCarForm = () => {
     setUploadedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Handle form submission
   const onSubmit = async (data) => {
-    // Check if images are uploaded
     if (uploadedImages.length === 0) {
       setImageError("Please upload at least one image");
       return;
     }
 
-    // Prepare data for server action
     const carData = {
       ...data,
-      year: parseInt(data.year),
-      price: parseFloat(data.price),
-      mileage: parseInt(data.mileage),
+      year: parseInt(data.year) || 0,
+      price: parseFloat(data.price) || 0,
+      mileage: parseInt(data.mileage) || 0,
       seats: data.seats ? parseInt(data.seats) : null,
     };
 
-    // Call the addCar function with our useFetch hook
+    // Client-side validation for price
+    if (carData.price <= 0) {
+      toast.error("Price must be greater than 0");
+      return;
+    }
+
     await addCarFn({
       carData,
       images: uploadedImages,
