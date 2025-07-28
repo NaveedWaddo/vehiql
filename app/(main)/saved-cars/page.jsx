@@ -1,27 +1,30 @@
 import { getSavedCars } from "@/actions/car-listing";
-import { SavedCarsList } from "./_components/saved-cars-list";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import SavedCarsList from "./_components/saved-cars-list";
 
 export const metadata = {
-  title: "Saved Cars | Vehiql",
-  description: "View your saved cars and favorites",
+    title: "Saved Cars | GearGrid",
+    description: "View your saved cars and favorites",
 };
 
-export default async function SavedCarsPage() {
-  // Check authentication on server
-  const { userId } = await auth();
-  if (!userId) {
-    redirect("/sign-in?redirect=/saved-cars");
-  }
+const SavedCarsPage = async () => {
+    // Check authentication on server
+    const { userId } = await auth();
 
-  // Fetch saved cars on the server
-  const savedCarsResult = await getSavedCars();
+    if (!userId) {
+        redirect("/sign-in?redirect=/saved-cars");
+    }
 
-  return (
-    <div className="container mx-auto px-4 py-12">
-      <h1 className="text-6xl mb-6 gradient-title">Your Saved Cars</h1>
-      <SavedCarsList initialData={savedCarsResult} />
-    </div>
-  );
+    // Fetch saved cars on the server
+    const savedCarsResult = await getSavedCars();
+
+    return (
+        <div className="container mx-auto px-4 py-12">
+            <h1 className="text-6xl mb-6 gradient-title">Your Saved Cars</h1>
+            <SavedCarsList initialData={savedCarsResult} />
+        </div>
+    );
 }
+
+export default SavedCarsPage;
